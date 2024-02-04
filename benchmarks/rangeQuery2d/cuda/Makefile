@@ -1,4 +1,4 @@
-include common/parallelDefs
+include common/parallelDefsCUDA
 
 BENCH = range
 OBJS = range.o
