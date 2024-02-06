@@ -20,19 +20,20 @@
 // #include "cuda_kernel.h"
 #include "cuda_runtime.h"
 
-__global__ void count(point* points, query* queries, int* result, int n){
+__global__ void count(point* points, query* queries, int* result, int n, int m){
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tid >= m) return;
   result[tid] = 0;
   for (int i = 0; i < n; i++)
   {
-    if (points[i].x <= queries[tid].x1 &&
-       points[i].y <= queries[tid].x1 &&
-       points[i].x >= queries[tid].x2 &&
-       points[i].y >= queries[tid].y2){
+    if (points[i].x >= queries[tid].x1 &&
+       points[i].y >= queries[tid].y1 &&
+       points[i].x <= queries[tid].x2 &&
+       points[i].y <= queries[tid].y2){
         result[tid]++;
        }
   }
-  
+  // result[tid] = 20;
 }
 
 long range(Points const &points, Queries const &queries, bool verbose) {
@@ -58,21 +59,20 @@ long range(Points const &points, Queries const &queries, bool verbose) {
 
   cudaMemcpy(dev_points, point_list, points.size() * sizeof(point), cudaMemcpyHostToDevice);
   cudaMemcpy(dev_queries, query_list, queries.size() * sizeof(query), cudaMemcpyHostToDevice);
-
-
-
+  // cudaMemcpy(dev_result, result_list, queries.size() * sizeof(query), cudaMemcpyHostToDevice);
   t.next("build");
-  count <<<1,queries.size()>>>(dev_points, dev_queries, dev_result, points.size());
+
+
+
+  count <<<queries.size()/1024 + 1,1024>>>(dev_points, dev_queries, dev_result, points.size(), queries.size());
   cudaMemcpy(result_list, dev_result, queries.size() * sizeof(int), cudaMemcpyDeviceToHost);
+
+  long total = 0;
   for (int i = 0; i < queries.size(); i++)
   {
-    std::cout<<result_list[i] << std::endl;
+    total += result_list[i];
   }
-  std::cerr << "salam";
   
-  /*auto result_s = parlay::map(queries, [&] (query q) {
-  	          return (long) r.count_in_range(q);});
-  long total = parlay::reduce(result_s);*/
   t.next("query");
 
 #ifdef CHECK
@@ -101,5 +101,5 @@ long range(Points const &points, Queries const &queries, bool verbose) {
 
   // r.clear();
   t.next("clear");
-  return 0;
+  return total;
 }
